@@ -58,8 +58,13 @@ class RiskEngine:
         # Net Position: (Cash + In) - Out
         net_position = (liquidity + inflow) - outflow
         
+        # Normalize to keep sigmoid in its sensitive region.
+        # Without this, large positive net positions saturate sigmoid to 0
+        # and the Jacobian becomes numerically zero.
+        scale = outflow.clamp(min=1.0)
+        
         # Risk Score: Sigmoid maps negative position to high risk (closer to 1.0)
-        return torch.sigmoid(-net_position)
+        return torch.sigmoid(-net_position / scale)
 
     @staticmethod
     def get_risk_adjacency_matrix(L, O, R):
@@ -105,14 +110,22 @@ class OptimizationNode:
                 if not edges: continue
                 
                 # Find the bottleneck (minimum amount in the loop)
-                weights = [G[u][v]['weight'] for u, v in edges]
-                min_val = min(weights)
-                
-                # Net it out (Subtract min_val from the loop)
+                weights = []
+                valid_cycle = True
                 for u, v in edges:
-                    G[u][v]['weight'] -= min_val
-                    if G[u][v]['weight'] <= 1e-4: # Prune zero edges
-                        G.remove_edge(u, v)
+                    if G.has_edge(u, v):
+                        weights.append(G[u][v]['weight'])
+                    else:
+                        valid_cycle = False
+                        break
+                
+                if valid_cycle and weights:
+                    min_val = min(weights)
+                    # Net it out (Subtract min_val from the loop)
+                    for u, v in edges:
+                        G[u][v]['weight'] -= min_val
+                        if G[u][v]['weight'] <= 1e-4: # Prune zero edges
+                            G.remove_edge(u, v)
                         
         except Exception as e:
             print(f"Optimization Notice: {e}")

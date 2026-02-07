@@ -60,7 +60,12 @@ class FinancialOptimizationEngine:
             inflow = torch.sum(O_input.T, dim=1)
             outflow = torch.sum(O_input, dim=1)
             net = (liquidity + inflow) - outflow
-            return torch.sigmoid(-net)  # Stress Score
+            # Normalize net position to keep sigmoid in its sensitive range.
+            # Without this, large positive net positions saturate sigmoid to 0,
+            # causing vanishing gradients and a dead Jacobian.
+            scale = outflow.clamp(min=1.0)
+            stress = torch.sigmoid(-net / scale)  # Normalized Stress Score
+            return stress
 
         # Compute Jacobian: d(Stress)/d(Obligations)
         # J shape: [N (output), N (input row), N (input col)]
@@ -87,20 +92,17 @@ class FinancialOptimizationEngine:
         netted_matrix, raw_load, net_load = self.optimizer.minimize_payload(pred_O, hubs)
 
         # 5. Result Formatting
-        print("--- Optimization Report ---")
-        if raw_load > 0:
-            print(f"Payload Reduction: {((raw_load - net_load) / raw_load) * 100:.2f}%")
-        else:
-            print("Payload Reduction: 0.00%")
-        print(f"System Stability Index: {stability:.4f}")
-        if stability > 1.0:
-            print("WARNING: SYSTEMIC INSTABILITY DETECTED. INCREASING MARGINS.")
+        payload_reduction = ((raw_load - net_load) / raw_load * 100) if raw_load > 0 else 0.0
 
         return {
             "obligations_to_ccp": netted_matrix,
+            "obligations_before": pred_O.detach().cpu().numpy(),
             "systemic_hubs": hubs,
-            "stability": stability,
-            "predicted_node_scores": node_scores.detach().cpu().numpy()
+            "stability": float(stability),
+            "predicted_node_scores": node_scores.detach().cpu().numpy(),
+            "payload_reduction": float(payload_reduction),
+            "raw_load": float(raw_load),
+            "net_load": float(net_load),
         }
 
 # Usage:

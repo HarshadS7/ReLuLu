@@ -1,3 +1,5 @@
+import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 def launch_stability_dashboard(tickers, predictions, adj_matrix):

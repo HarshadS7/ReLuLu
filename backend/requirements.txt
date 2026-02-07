@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+torch
+torch-geometric
+numpy
+pandas
+networkx
+matplotlib
+seaborn
+yfinance
