@@ -9,9 +9,9 @@ export function ObligationsMatrix({
 }) {
   const max = Math.max(...matrix.flat(), 0.01);
   return (
-    <div>
+    <div className="flex flex-col items-center">
       <h3 className="mb-3 text-sm font-semibold text-zinc-300">{title}</h3>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto w-full flex justify-center">
         <table className="text-xs font-mono">
           <thead>
             <tr>

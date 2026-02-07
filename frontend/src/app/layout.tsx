@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ParticlesBackground from "@/components/ParticlesBackground";
-import IntroLoader from "@/components/IntroLoader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,8 +28,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ParticlesBackground />
-        <IntroLoader />
         {children}
       </body>
     </html>

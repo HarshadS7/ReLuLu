@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import localFont from "next/font/local";
+import Link from "next/link";
 import axios from "axios";
 import {
   Activity,
@@ -30,12 +32,19 @@ import {
   HorizonTimeline,
   TickerBar,
 } from "./components";
+import IntroLoader from "@/components/IntroLoader";
+
+const rostex = localFont({
+  src: "../fonts/ALTRONED Trial.otf",
+  display: "swap",
+});
 
 const API = "http://localhost:8000";
 
 // =====================================================================
 // Main Page
 // =====================================================================
+
 export default function Home() {
   const [data, setData] = useState<ForecastResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,14 +87,18 @@ export default function Home() {
   // --- Manual run ---
   const runForecast = async () => {
     setLoading(true);
-    await fetchForecast(false);
+    await Promise.all([
+      fetchForecast(true),
+      new Promise((r) => setTimeout(r, 1000)),
+    ]);
+    setLoading(false);
     setCountdown(POLL_INTERVAL_S);
   };
 
   // --- Auto-poll effect ---
   useEffect(() => {
-    // Initial fetch
-    fetchForecast(false);
+    // Auto-run forecast on initial load
+    runForecast();
     setCountdown(POLL_INTERVAL_S);
 
     return () => {
@@ -119,20 +132,35 @@ export default function Home() {
   const snap: HorizonSnapshot | undefined = data?.horizons[activeHorizon];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-[#0d0417] text-zinc-100">
+      <IntroLoader />
       {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-4">
+      <header className="border-b border-white/10 bg-[#0d0417] px-8 py-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Zap className="h-6 w-6 text-blue-500" />
-            <h1 className="text-lg font-bold tracking-tight">
-              Spectra{" "}
-              <span className="font-normal text-zinc-500">
+          <div className="flex items-center gap-4">
+            <video
+              src="/34004-399415222_tiny.webm"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-20 w-20 rounded-xl object-cover mix-blend-screen brightness-[0.6] contrast-[2]"
+            />
+            <h1 className="tracking-tight">
+              <span className={`${rostex.className} text-3xl`}>SPECTRA</span>{" "}
+              <span className="text-base font-normal text-zinc-500">
                 Temporal Forecast Engine
               </span>
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/risk"
+              className="flex items-center gap-1.5 rounded-lg bg-red-600/15 px-3 py-2 text-xs font-medium text-red-400 ring-1 ring-red-500/25 transition hover:bg-red-600/25"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Risk Analysis
+            </Link>
             {/* Auto-refresh toggle */}
             <button
               onClick={() => setAutoRefresh((v) => !v)}
@@ -284,11 +312,11 @@ export default function Home() {
 
             {/* Two-column: Hubs + Predictions */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 flex flex-col">
                 <h2 className="mb-4 text-sm font-semibold text-zinc-300">
                   Systemic Hub Rankings — T+{snap.horizon}
                 </h2>
-                <div className="space-y-3">
+                <div className="flex-1 flex flex-col justify-between">
                   {[...snap.banks]
                     .sort((a, b) => b.hub_score - a.hub_score)
                     .map((b) => (
