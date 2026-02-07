@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import pandas as pd
-from save_model import get_systemic_data
+from ReLuLu.save_model import get_systemic_data
 
 # --- 1. CONFIGURATION & MARKET CAPS ---
 # Estimated Market Caps (in Billions USD) for scaling

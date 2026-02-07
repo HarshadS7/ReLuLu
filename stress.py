@@ -4,7 +4,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import seaborn as sns
 # Ensure these imports match the filenames and class names in your directory
-from save_model import SuperNodeGNN, get_systemic_data, create_windows 
+from ReLuLu.save_model import SuperNodeGNN, get_systemic_data, create_windows 
 
 # --- 1. CONFIGURATION ---
 MODEL_PATH = 'super_node_v1.pth'
