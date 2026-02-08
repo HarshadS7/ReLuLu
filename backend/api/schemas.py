@@ -9,6 +9,7 @@ class BankResult(BaseModel):
     name: str
     predicted_score: float
     hub_score: float
+    risk_factor: float
 
 
 class EdgeResult(BaseModel):
@@ -28,6 +29,12 @@ class HorizonSnapshot(BaseModel):
     payload_reduction: float
     raw_load: float
     net_load: float
+    risk_buffer: float
+    risk_adjusted_net_load: float
+    risk_adjusted_payload_reduction: float
+    worst_case_buffer: float
+    worst_case_net_load: float
+    worst_case_payload_reduction: float
     obligations_before: list[list[float]]
     obligations_after: list[list[float]]
 
@@ -57,5 +64,11 @@ class PipelineResponse(BaseModel):
     payload_reduction: float
     raw_load: float
     net_load: float
+    risk_buffer: float
+    risk_adjusted_net_load: float
+    risk_adjusted_payload_reduction: float
+    worst_case_buffer: float
+    worst_case_net_load: float
+    worst_case_payload_reduction: float
     obligations_before: list[list[float]]
     obligations_after: list[list[float]]

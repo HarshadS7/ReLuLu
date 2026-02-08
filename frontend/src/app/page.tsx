@@ -29,7 +29,7 @@ import {
   StatCard,
   HubBar,
   ObligationsMatrix,
-  HorizonTimeline,
+  ForecastChart,
   TickerBar,
 } from "./components";
 import IntroLoader from "@/components/IntroLoader";
@@ -242,8 +242,8 @@ export default function Home() {
               <span>{data.horizons.length} forecast horizons</span>
             </div>
 
-            {/* Horizon timeline */}
-            <HorizonTimeline
+            {/* Forecast chart */}
+            <ForecastChart
               horizons={data.horizons}
               selected={activeHorizon}
               onSelect={setActiveHorizon}
@@ -285,6 +285,38 @@ export default function Home() {
                 sub="Post-netting residual"
                 icon={TrendingUp}
                 accent="green"
+              />
+            </div>
+
+            {/* Risk-adjusted settlement cards */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Risk Buffer"
+                value={`$${snap.risk_buffer.toFixed(1)}M`}
+                sub="Σ(riskᵢ × outflowᵢ)"
+                icon={AlertTriangle}
+                accent="amber"
+              />
+              <StatCard
+                label="Risk-Adj Required"
+                value={`$${snap.risk_adjusted_net_load.toFixed(1)}M`}
+                sub={`${snap.risk_adjusted_payload_reduction.toFixed(1)}% effective reduction`}
+                icon={TrendingDown}
+                accent="amber"
+              />
+              <StatCard
+                label="Worst-Case Buffer"
+                value={`$${snap.worst_case_buffer.toFixed(1)}M`}
+                sub="Top-risk banks full outflow"
+                icon={AlertTriangle}
+                accent="red"
+              />
+              <StatCard
+                label="Worst-Case Required"
+                value={`$${snap.worst_case_net_load.toFixed(1)}M`}
+                sub={`${snap.worst_case_payload_reduction.toFixed(1)}% effective reduction`}
+                icon={TrendingDown}
+                accent="red"
               />
             </div>
 

@@ -5,6 +5,7 @@ export interface BankResult {
   name: string;
   predicted_score: number;
   hub_score: number;
+  risk_factor: number;
 }
 
 export interface EdgeResult {
@@ -24,6 +25,12 @@ export interface HorizonSnapshot {
   payload_reduction: number;
   raw_load: number;
   net_load: number;
+  risk_buffer: number;
+  risk_adjusted_net_load: number;
+  risk_adjusted_payload_reduction: number;
+  worst_case_buffer: number;
+  worst_case_net_load: number;
+  worst_case_payload_reduction: number;
   obligations_before: number[][];
   obligations_after: number[][];
 }

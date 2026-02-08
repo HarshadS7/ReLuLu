@@ -1,1 +1,10 @@
 venv
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Aider (AI coding assistant)
+.aider/
+.aider*

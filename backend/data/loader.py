@@ -17,7 +17,17 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime
 
-from data.constants import BANK_TICKERS, MACRO_TICKERS, CORRELATION_THRESHOLD
+from data.constants import (
+    BANK_TICKERS,
+    MACRO_TICKERS,
+    CORRELATION_THRESHOLD,
+    RISK_FACTOR_WINDOW_DAYS,
+    RISK_EWMA_LAMBDA,
+    RISK_DOWNSIDE_WEIGHT,
+    ANOMALY_Z_THRESHOLD,
+    ANOMALY_LOOKBACK_DAYS,
+    ANOMALY_RECENT_DAYS,
+)
 
 
 class TimeSeriesLoader:
@@ -180,6 +190,96 @@ class TimeSeriesLoader:
         liq = 1.0 / (vol + 1e-8)
         liq = liq / liq.max() * 100 + 50  # normalise into ~[50, 150]
         return torch.tensor(liq, dtype=torch.float32)
+
+    def build_time_series_risk_factor(
+        self,
+        window_days: int = RISK_FACTOR_WINDOW_DAYS,
+        ewma_lambda: float = RISK_EWMA_LAMBDA,
+        downside_weight: float = RISK_DOWNSIDE_WEIGHT,
+    ) -> torch.Tensor:
+        """Per-bank risk factor in [0,1] derived purely from time-series returns.
+
+        Definition (default): mixture of EWMA volatility and downside magnitude.
+        - EWMA volatility captures "how unstable is it lately"
+        - Downside captures "how negative are recent returns"
+
+        Returns
+        -------
+        Tensor [N] with values in [0, 1]. Higher = riskier.
+        """
+        n = len(self.bank_tickers)
+        if self.bank_returns is None or len(self.bank_returns) == 0:
+            rf = torch.rand(n)
+            return torch.clamp(rf, 0.0, 1.0)
+
+        r = self.bank_returns.iloc[-window_days:].values  # [T, N]
+        if r.shape[0] < 2:
+            return torch.zeros(n, dtype=torch.float32)
+
+        # EWMA volatility (RiskMetrics-style)
+        lam = float(np.clip(ewma_lambda, 0.0, 0.9999))
+        w = (1.0 - lam) * (lam ** np.arange(r.shape[0] - 1, -1, -1))  # [T]
+        w = w / (w.sum() + 1e-12)
+        ewma_var = (w[:, None] * (r ** 2)).sum(axis=0)  # [N]
+        ewma_vol = np.sqrt(np.maximum(ewma_var, 0.0))
+
+        # Downside magnitude (average negative return size)
+        downside = np.maximum(-r, 0.0).mean(axis=0)  # [N]
+
+        def _norm01(x: np.ndarray) -> np.ndarray:
+            x = np.asarray(x, dtype=float)
+            denom = np.max(x)
+            if not np.isfinite(denom) or denom <= 1e-12:
+                return np.zeros_like(x)
+            return np.clip(x / denom, 0.0, 1.0)
+
+        vol_n = _norm01(ewma_vol)
+        down_n = _norm01(downside)
+
+        a = float(np.clip(downside_weight, 0.0, 1.0))
+        risk = (1.0 - a) * vol_n + a * down_n
+        return torch.tensor(risk, dtype=torch.float32)
+
+    # ------------------------------------------------------------------
+    # Anomaly detection on time-series returns
+    # ------------------------------------------------------------------
+    def detect_anomalies(
+        self,
+        lookback_days: int = ANOMALY_LOOKBACK_DAYS,
+        recent_days: int = ANOMALY_RECENT_DAYS,
+        z_threshold: float = ANOMALY_Z_THRESHOLD,
+    ) -> list[dict]:
+        """Flag banks whose recent returns spike beyond z_threshold σ.
+
+        Returns a list of dicts, one per anomaly detected:
+          { "bank", "date", "return", "z_score", "direction" }
+        Empty list if no anomalies.
+        """
+        if self.bank_returns is None or len(self.bank_returns) < lookback_days:
+            return []
+
+        window = self.bank_returns.iloc[-lookback_days:]
+        mu = window.mean()                # [N]
+        sigma = window.std()              # [N]
+
+        recent = self.bank_returns.iloc[-recent_days:]
+        anomalies = []
+        for ticker in self.bank_tickers:
+            s = sigma[ticker]
+            m = mu[ticker]
+            if s < 1e-12:
+                continue
+            for date_idx, ret_val in recent[ticker].items():
+                z = (ret_val - m) / s
+                if abs(z) >= z_threshold:
+                    anomalies.append({
+                        "bank": ticker,
+                        "date": str(date_idx.date()) if hasattr(date_idx, "date") else str(date_idx),
+                        "return": float(ret_val),
+                        "z_score": round(float(z), 3),
+                        "direction": "SPIKE UP" if z > 0 else "SPIKE DOWN",
+                    })
+        return anomalies
 
 
 # --------------- quick test ---------------

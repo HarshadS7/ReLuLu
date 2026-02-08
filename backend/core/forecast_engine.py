@@ -10,11 +10,11 @@ Pipeline per horizon:
   4. Circular netting → payload reduction
 """
 
-import os
 import torch
 import numpy as np
 
 from data.loader import TimeSeriesLoader
+from data.constants import RISK_BUFFER_MULTIPLIER, WORST_CASE_TOP_FRACTION
 from models import TemporalGNN, SuperNodeGNN
 from core.optimize import OptimizationNode
 
@@ -81,6 +81,7 @@ class ForecastEngine:
         node_scores: torch.Tensor,
         liquidity: torch.Tensor,
         base_obligations: torch.Tensor,
+        risk_factor: torch.Tensor,
     ) -> dict:
         """Run the full Jacobian → hubs → netting pipeline for one horizon."""
         pred_O = self._build_obligations(node_scores, base_obligations)
@@ -91,8 +92,37 @@ class ForecastEngine:
         netted, raw_load, net_load = self.optimizer.minimize_payload(pred_O, hubs)
         pct = ((raw_load - net_load) / raw_load * 100) if raw_load > 0 else 0.0
 
+        # Risk-adjusted required money: add a buffer proportional to risky outflows
+        outflow = torch.sum(pred_O, dim=1)
+        risk_buffer = float(
+            (risk_factor * outflow).sum().detach().cpu().item()
+        ) * float(RISK_BUFFER_MULTIPLIER)
+        risk_adjusted_net_load = float(net_load) + risk_buffer
+        risk_adjusted_pct = max(
+            0.0,
+            ((raw_load - risk_adjusted_net_load) / raw_load * 100)
+            if raw_load > 0
+            else 0.0,
+        )
+
+        # Worst-case: buffer full outflow for top-risk banks
+        n = int(risk_factor.shape[0])
+        k = max(1, int(np.ceil(n * float(WORST_CASE_TOP_FRACTION))))
+        _, idx = torch.topk(risk_factor, k=k)
+        worst_case_buffer = float(outflow[idx].sum().detach().cpu().item()) * float(
+            RISK_BUFFER_MULTIPLIER
+        )
+        worst_case_net_load = float(net_load) + worst_case_buffer
+        worst_case_pct = max(
+            0.0,
+            ((raw_load - worst_case_net_load) / raw_load * 100)
+            if raw_load > 0
+            else 0.0,
+        )
+
         return {
             "node_scores": node_scores.detach().cpu().numpy(),
+            "risk_factor": risk_factor.detach().cpu().numpy(),
             "obligations_before": pred_O.detach().cpu().numpy(),
             "obligations_after": netted,
             "systemic_hubs": hubs,
@@ -100,6 +130,12 @@ class ForecastEngine:
             "payload_reduction": float(pct),
             "raw_load": float(raw_load),
             "net_load": float(net_load),
+            "risk_buffer": float(risk_buffer),
+            "risk_adjusted_net_load": float(risk_adjusted_net_load),
+            "risk_adjusted_payload_reduction": float(risk_adjusted_pct),
+            "worst_case_buffer": float(worst_case_buffer),
+            "worst_case_net_load": float(worst_case_net_load),
+            "worst_case_payload_reduction": float(worst_case_pct),
         }
 
     # ------------------------------------------------------------------
@@ -117,6 +153,7 @@ class ForecastEngine:
         edge_index = self.loader.edge_index.to(self.device)
         liquidity = self.loader.build_liquidity().to(self.device)
         base_obl = self.loader.build_base_obligations().to(self.device)
+        ts_risk = self.loader.build_time_series_risk_factor().to(self.device)
         latest = self.loader.get_latest_window().to(self.device)  # [N, W, F]
 
         if self.is_temporal:
@@ -125,13 +162,18 @@ class ForecastEngine:
 
             horizons = []
             for k in range(all_forecasts.shape[0]):
-                snap = self._analyse_horizon(all_forecasts[k], liquidity, base_obl)
+                snap = self._analyse_horizon(
+                    all_forecasts[k],
+                    liquidity,
+                    base_obl,
+                    ts_risk,
+                )
                 snap["horizon"] = k + 1
                 horizons.append(snap)
         else:
             with torch.no_grad():
                 scores = self.model(latest, edge_index).squeeze(-1)
-            snap = self._analyse_horizon(scores, liquidity, base_obl)
+            snap = self._analyse_horizon(scores, liquidity, base_obl, ts_risk)
             snap["horizon"] = 1
             horizons = [snap]
 

@@ -38,6 +38,7 @@ def _format_snapshot(snap: dict, tickers: list[str]) -> HorizonSnapshot:
             name=name,
             predicted_score=round(float(snap["node_scores"][i]), 6),
             hub_score=round(float(snap["systemic_hubs"][i]), 4),
+            risk_factor=round(float(snap["risk_factor"][i]), 6),
         ))
 
     ob_before = snap["obligations_before"]
@@ -71,6 +72,12 @@ def _format_snapshot(snap: dict, tickers: list[str]) -> HorizonSnapshot:
         payload_reduction=round(snap["payload_reduction"], 2),
         raw_load=round(snap["raw_load"], 2),
         net_load=round(snap["net_load"], 2),
+        risk_buffer=round(float(snap.get("risk_buffer", 0.0)), 2),
+        risk_adjusted_net_load=round(float(snap.get("risk_adjusted_net_load", snap["net_load"])), 2),
+        risk_adjusted_payload_reduction=round(float(snap.get("risk_adjusted_payload_reduction", snap["payload_reduction"])), 2),
+        worst_case_buffer=round(float(snap.get("worst_case_buffer", 0.0)), 2),
+        worst_case_net_load=round(float(snap.get("worst_case_net_load", snap["net_load"])), 2),
+        worst_case_payload_reduction=round(float(snap.get("worst_case_payload_reduction", snap["payload_reduction"])), 2),
         obligations_before=[[round(float(v), 4) for v in row] for row in ob_before],
         obligations_after=[[round(float(v), 4) for v in row] for row in ob_after],
     )
@@ -144,6 +151,12 @@ def run_pipeline():
         payload_reduction=snap.payload_reduction,
         raw_load=snap.raw_load,
         net_load=snap.net_load,
+        risk_buffer=snap.risk_buffer,
+        risk_adjusted_net_load=snap.risk_adjusted_net_load,
+        risk_adjusted_payload_reduction=snap.risk_adjusted_payload_reduction,
+        worst_case_buffer=snap.worst_case_buffer,
+        worst_case_net_load=snap.worst_case_net_load,
+        worst_case_payload_reduction=snap.worst_case_payload_reduction,
         obligations_before=snap.obligations_before,
         obligations_after=snap.obligations_after,
     )
