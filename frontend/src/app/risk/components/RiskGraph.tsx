@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import type { BankResult, EdgeResult } from "../../types";
+import { useTheme } from "@/context/ThemeContext";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
@@ -69,6 +70,11 @@ export function RiskGraph({
     0.01
   );
 
+  /* --- Theme Awareness --- */
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const labelFill = isDark ? "#ffffff" : "#18181b"; // white vs zinc-900
+
   const nodeColor = useCallback(
     (node: GraphNode) => {
       const ratio = node.hubScore / maxHub;
@@ -93,9 +99,9 @@ export function RiskGraph({
       const ratio = w / maxWeight;
       if (ratio > 0.6) return "rgba(239, 68, 68, 0.6)";
       if (ratio > 0.3) return "rgba(245, 158, 11, 0.4)";
-      return "rgba(161, 161, 170, 0.2)";
+      return isDark ? "rgba(161, 161, 170, 0.2)" : "rgba(113, 113, 122, 0.2)";
     },
-    [mode, maxWeight]
+    [mode, maxWeight, isDark]
   );
 
   const nodeLabel = useCallback(
@@ -127,26 +133,45 @@ export function RiskGraph({
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.strokeStyle = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
       // Label
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = labelFill;
       ctx.font = `bold ${Math.max(r * 0.7, 8)}px monospace`;
       ctx.fillText(node.id, x, y);
     },
-    [nodeColor]
+    [nodeColor, labelFill, isDark]
   );
+
+  const fgRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (fgRef.current) {
+      // Repulsion: Strong enough to separate, but not explode
+      fgRef.current.d3Force('charge').strength(-400);
+
+      // Links: Elastic behavior
+      fgRef.current.d3Force('link')
+        .distance(150)
+        .strength(0.2);
+
+      // Re-heat simulation
+      fgRef.current.d3ReheatSimulation();
+    }
+  }, [banks, edges, mode]);
 
   return (
     <div ref={containerRef} className="w-full h-full min-h-[500px]">
       <ForceGraph2D
+        ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
         graphData={{ nodes, links }}
+        d3VelocityDecay={0.3}
         nodeCanvasObject={nodeCanvasObject as never}
         nodePointerAreaPaint={((node: GraphNode & { x?: number; y?: number }, color: string, ctx: CanvasRenderingContext2D) => {
           ctx.beginPath();
@@ -160,8 +185,12 @@ export function RiskGraph({
         linkDirectionalArrowLength={4}
         linkDirectionalArrowRelPos={0.9}
         backgroundColor="transparent"
-        cooldownTicks={80}
-        linkCurvature={0.15}
+        cooldownTicks={100}
+        onEngineStop={() => {
+          // Optional: keep it alive or let it stop
+          if (fgRef.current) fgRef.current.zoomToFit(400, 20);
+        }}
+        linkCurvature={0.25}
       />
     </div>
   );

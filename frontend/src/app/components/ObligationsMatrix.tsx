@@ -10,14 +10,14 @@ export function ObligationsMatrix({
   const max = Math.max(...matrix.flat(), 0.01);
   return (
     <div className="flex flex-col items-center">
-      <h3 className="mb-3 text-sm font-semibold text-zinc-300">{title}</h3>
+      <h3 className="mb-3 text-sm font-semibold theme-text-secondary">{title}</h3>
       <div className="overflow-x-auto w-full flex justify-center">
         <table className="text-xs font-mono">
           <thead>
             <tr>
               <th className="p-1" />
               {banks.map((b) => (
-                <th key={b} className="p-1 text-zinc-500 font-normal">
+                <th key={b} className="p-1 theme-text-muted font-normal">
                   {b}
                 </th>
               ))}
@@ -26,7 +26,7 @@ export function ObligationsMatrix({
           <tbody>
             {matrix.map((row, i) => (
               <tr key={i}>
-                <td className="pr-2 text-zinc-500">{banks[i]}</td>
+                <td className="pr-2 theme-text-muted">{banks[i]}</td>
                 {row.map((val, j) => {
                   const intensity = i === j ? 0 : val / max;
                   return (
@@ -38,7 +38,7 @@ export function ObligationsMatrix({
                           i === j
                             ? "transparent"
                             : `rgba(239,68,68,${intensity * 0.7})`,
-                        color: intensity > 0.4 ? "#fff" : "#a1a1aa",
+                        color: intensity > 0.4 ? "#fff" : "var(--text-muted)",
                       }}
                     >
                       {i === j ? "—" : val.toFixed(1)}

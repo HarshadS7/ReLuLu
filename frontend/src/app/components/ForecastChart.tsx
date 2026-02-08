@@ -14,6 +14,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { HorizonSnapshot } from "../types";
+import { useTheme } from "@/context/ThemeContext";
 
 interface Props {
   horizons: HorizonSnapshot[];
@@ -46,12 +47,22 @@ export function ForecastChart({ horizons, selected, onSelect }: Props) {
     if (data && typeof data.idx === "number") onSelect(data.idx);
   };
 
+  /* --- Theme Awareness --- */
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
+  const gridColor = isDark ? "#27272a" : "#e4e4e7"; // zinc-800 vs zinc-200
+  const axisColor = isDark ? "#a1a1aa" : "#71717a"; // zinc-400 vs zinc-500
+  const tooltipBg = isDark ? "#18181b" : "#ffffff";
+  const tooltipBorder = isDark ? "#3f3f46" : "#e4e4e7";
+  const labelColor = isDark ? "#e4e4e7" : "#18181b";
+
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-      <h2 className="mb-1 text-sm font-semibold text-zinc-300">
+    <div className="rounded-xl border theme-border theme-card p-5 transition-colors duration-300">
+      <h2 className="mb-1 text-sm font-semibold theme-text-primary">
         Forecast Timeline — Settlement Sizing Across Horizons
       </h2>
-      <p className="mb-4 text-[11px] text-zinc-500">
+      <p className="mb-4 text-[11px] theme-text-muted">
         Click any bar to inspect that horizon. Lines show how much money is
         actually needed after netting + risk buffers.
       </p>
@@ -64,48 +75,48 @@ export function ForecastChart({ horizons, selected, onSelect }: Props) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(e: any) => e?.activePayload && handleClick(e.activePayload[0]?.payload)}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
             <XAxis
               dataKey="name"
-              tick={{ fill: "#a1a1aa", fontSize: 12 }}
-              axisLine={{ stroke: "#3f3f46" }}
+              tick={{ fill: axisColor, fontSize: 12 }}
+              axisLine={{ stroke: gridColor }}
               tickLine={false}
             />
             <YAxis
               yAxisId="money"
-              tick={{ fill: "#a1a1aa", fontSize: 11 }}
+              tick={{ fill: axisColor, fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               label={{
                 value: "Settlement ($)",
                 angle: -90,
                 position: "insideLeft",
-                style: { fill: "#71717a", fontSize: 11 },
+                style: { fill: axisColor, fontSize: 11 },
               }}
             />
             <YAxis
               yAxisId="pct"
               orientation="right"
               domain={[0, 100]}
-              tick={{ fill: "#a1a1aa", fontSize: 11 }}
+              tick={{ fill: axisColor, fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               label={{
                 value: "Reduction %",
                 angle: 90,
                 position: "insideRight",
-                style: { fill: "#71717a", fontSize: 11 },
+                style: { fill: axisColor, fontSize: 11 },
               }}
             />
 
             <Tooltip
               contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #3f3f46",
+                backgroundColor: tooltipBg,
+                border: `1px solid ${tooltipBorder}`,
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              labelStyle={{ color: "#e4e4e7", fontWeight: 600 }}
+              labelStyle={{ color: labelColor, fontWeight: 600 }}
               itemStyle={{ padding: "2px 0" }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               formatter={(value: any, name: any) => {
@@ -135,7 +146,7 @@ export function ForecastChart({ horizons, selected, onSelect }: Props) {
                   riskAdjReduction: "Risk-Adj %",
                   worstCaseReduction: "Worst-Case %",
                 };
-                return labels[value] || value;
+                return <span style={{ color: axisColor }}>{labels[value] || value}</span>;
               }}
             />
 
@@ -143,7 +154,7 @@ export function ForecastChart({ horizons, selected, onSelect }: Props) {
             <Bar
               yAxisId="money"
               dataKey="rawLoad"
-              fill="#52525b"
+              fill={isDark ? "#52525b" : "#a1a1aa"}
               radius={[4, 4, 0, 0]}
               barSize={28}
               opacity={0.5}
@@ -220,7 +231,7 @@ export function ForecastChart({ horizons, selected, onSelect }: Props) {
       </div>
 
       {/* Mini legend for context */}
-      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-zinc-500">
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] theme-text-muted">
         <span>
           <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-zinc-500" />
           Gross = total obligations before netting

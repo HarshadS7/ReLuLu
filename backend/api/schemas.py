@@ -70,5 +70,56 @@ class PipelineResponse(BaseModel):
     worst_case_buffer: float
     worst_case_net_load: float
     worst_case_payload_reduction: float
-    obligations_before: list[list[float]]
     obligations_after: list[list[float]]
+
+
+class AnalystResponse(BaseModel):
+    risk_assessment: str
+    status: str
+
+
+class BacktestMetrics(BaseModel):
+    mae: float | None
+    directional_accuracy: float | None
+    correlation: float | None
+
+
+class BacktestAggregate(BaseModel):
+    total_days: int
+    avg_mae: float | None
+    avg_directional_accuracy: float | None
+    best_day: str | None
+    worst_day: str | None
+
+
+class BacktestResponse(BaseModel):
+    aggregate: BacktestAggregate
+    results: list[dict]
+    timestamp: str
+
+
+class AlertConfig(BaseModel):
+    id: str
+    type: str
+    name: str
+    description: str
+    threshold: float
+    enabled: bool
+    created_at: str
+
+
+class AlertTriggered(BaseModel):
+    id: str
+    type: str
+    name: str
+    message: str
+    triggered_at: str
+    current_value: float | None
+
+
+class AlertCreateRequest(BaseModel):
+    type: str
+    name: str
+    threshold: float
+    description: str = ""
+    enabled: bool = True

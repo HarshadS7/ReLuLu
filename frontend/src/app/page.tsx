@@ -12,7 +12,10 @@ import {
   Clock,
   Database,
   Loader2,
+  Moon,
   Play,
+  BrainCircuit,
+  Sun,
   TrendingDown,
   TrendingUp,
   Wifi,
@@ -33,6 +36,7 @@ import {
   TickerBar,
 } from "./components";
 import IntroLoader from "@/components/IntroLoader";
+import { useTheme } from "@/context/ThemeContext";
 
 const rostex = localFont({
   src: "../fonts/ALTRONED Trial.otf",
@@ -46,6 +50,7 @@ const API = "http://localhost:8000";
 // =====================================================================
 
 export default function Home() {
+  const { theme, toggleTheme } = useTheme();
   const [data, setData] = useState<ForecastResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,11 +137,11 @@ export default function Home() {
   const snap: HorizonSnapshot | undefined = data?.horizons[activeHorizon];
 
   return (
-    <div className="min-h-screen bg-[#0d0417] text-zinc-100">
+    <div className="min-h-screen theme-bg-primary theme-text-primary transition-colors duration-300">
       <IntroLoader />
       {/* Header */}
-      <header className="border-b border-white/10 bg-[#0d0417] px-8 py-6">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
+      <header className="border-b theme-border theme-bg-primary px-4 sm:px-8 py-4 sm:py-6">
+        <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <video
               src="/34004-399415222_tiny.webm"
@@ -144,31 +149,64 @@ export default function Home() {
               loop
               muted
               playsInline
-              className="h-20 w-20 rounded-xl object-cover mix-blend-screen brightness-[0.6] contrast-[2]"
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl object-cover mix-blend-screen brightness-[0.6] contrast-[2]"
             />
             <h1 className="tracking-tight">
-              <span className={`${rostex.className} text-3xl`}>SPECTRA</span>{" "}
-              <span className="text-base font-normal text-zinc-500">
+              <span className={`${rostex.className} text-2xl sm:text-3xl`}>SPECTRA</span>{" "}
+              <span className="text-sm sm:text-base font-normal theme-text-muted">
                 Temporal Forecast Engine
               </span>
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
             <Link
               href="/risk"
               className="flex items-center gap-1.5 rounded-lg bg-red-600/15 px-3 py-2 text-xs font-medium text-red-400 ring-1 ring-red-500/25 transition hover:bg-red-600/25"
             >
               <AlertTriangle className="h-3.5 w-3.5" />
-              Risk Analysis
+              Risk
             </Link>
+            <Link
+              href="/analyst"
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-400 ring-1 ring-blue-500/25 transition hover:bg-blue-600/25"
+            >
+              <BrainCircuit className="h-3.5 w-3.5" />
+              AI Analyst
+            </Link>
+            <Link
+              href="/backtest"
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-600/15 px-3 py-2 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/25 transition hover:bg-emerald-600/25"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              Backtest
+            </Link>
+            <Link
+              href="/alerts"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-600/15 px-3 py-2 text-xs font-medium text-amber-400 ring-1 ring-amber-500/25 transition hover:bg-amber-600/25"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Alerts
+            </Link>
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 rounded-lg theme-bg-tertiary px-3 py-2 text-xs font-medium theme-text-secondary ring-1 theme-border transition hover:opacity-80"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+              {theme === "dark" ? "Light" : "Dark"}
+            </button>
             {/* Auto-refresh toggle */}
             <button
               onClick={() => setAutoRefresh((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${
-                autoRefresh
-                  ? "bg-green-600/20 text-green-400 ring-1 ring-green-500/30"
-                  : "bg-zinc-800 text-zinc-500 ring-1 ring-zinc-700"
-              }`}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${autoRefresh
+                ? "bg-green-600/20 text-green-400 ring-1 ring-green-500/30"
+                : "theme-bg-tertiary theme-text-muted ring-1 theme-border"
+                }`}
               title={autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
             >
               {autoRefresh ? (
@@ -322,11 +360,10 @@ export default function Home() {
 
             {/* Status Banner */}
             <div
-              className={`flex items-center gap-3 rounded-xl border px-5 py-4 ${
-                snap.is_stable
-                  ? "border-green-500/30 bg-green-500/10"
-                  : "border-red-500/30 bg-red-500/10"
-              }`}
+              className={`flex items-center gap-3 rounded-xl border px-5 py-4 ${snap.is_stable
+                ? "border-green-500/30 bg-green-500/10"
+                : "border-red-500/30 bg-red-500/10"
+                }`}
             >
               {snap.is_stable ? (
                 <CheckCircle className="h-5 w-5 text-green-400" />
@@ -344,8 +381,8 @@ export default function Home() {
 
             {/* Two-column: Hubs + Predictions */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 flex flex-col">
-                <h2 className="mb-4 text-sm font-semibold text-zinc-300">
+              <div className="rounded-xl border theme-border theme-card p-5 flex flex-col">
+                <h2 className="mb-4 text-sm font-semibold theme-text-secondary">
                   Systemic Hub Rankings — T+{snap.horizon}
                 </h2>
                 <div className="flex-1 flex flex-col justify-between">
@@ -361,25 +398,24 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-                <h2 className="mb-4 text-sm font-semibold text-zinc-300">
+              <div className="rounded-xl border theme-border theme-card p-5">
+                <h2 className="mb-4 text-sm font-semibold theme-text-secondary">
                   Forecast Signals — T+{snap.horizon}
                 </h2>
                 <div className="space-y-2">
                   {snap.banks.map((b) => (
                     <div
                       key={b.name}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-zinc-800/50"
+                      className="flex items-center justify-between rounded-lg px-3 py-2 hover:theme-bg-tertiary transition-colors"
                     >
-                      <span className="text-sm font-mono text-zinc-300">
+                      <span className="text-sm font-mono theme-text-secondary">
                         {b.name}
                       </span>
                       <span
-                        className={`text-sm font-mono font-medium ${
-                          b.predicted_score < 0
-                            ? "text-red-400"
-                            : "text-green-400"
-                        }`}
+                        className={`text-sm font-mono font-medium ${b.predicted_score < 0
+                          ? "text-red-500"
+                          : "text-green-500"
+                          }`}
                       >
                         {b.predicted_score > 0 ? "+" : ""}
                         {(b.predicted_score * 100).toFixed(3)}%
@@ -392,14 +428,14 @@ export default function Home() {
 
             {/* Obligations Matrices */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+              <div className="rounded-xl border theme-border theme-card p-5 overflow-x-auto">
                 <ObligationsMatrix
                   matrix={snap.obligations_before}
                   banks={snap.banks.map((b) => b.name)}
                   title={`Obligations BEFORE Netting — T+${snap.horizon}`}
                 />
               </div>
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+              <div className="rounded-xl border theme-border theme-card p-5 overflow-x-auto">
                 <ObligationsMatrix
                   matrix={snap.obligations_after}
                   banks={snap.banks.map((b) => b.name)}
@@ -409,19 +445,19 @@ export default function Home() {
             </div>
 
             {/* Edge Details */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-              <h2 className="mb-4 text-sm font-semibold text-zinc-300">
+            <div className="rounded-xl border theme-border theme-card p-5">
+              <h2 className="mb-4 text-sm font-semibold theme-text-secondary">
                 Top Residual Obligations — T+{snap.horizon}
               </h2>
               {snap.edges_after.length === 0 ? (
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm theme-text-muted">
                   All obligations fully netted — zero residual.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-zinc-800 text-left text-xs text-zinc-500">
+                      <tr className="border-b theme-border text-left text-xs theme-text-muted">
                         <th className="pb-2 pr-4">From</th>
                         <th className="pb-2 pr-4">To</th>
                         <th className="pb-2 pr-4 text-right">Before</th>
@@ -437,15 +473,15 @@ export default function Home() {
                           const reduction =
                             e.weight_before > 0
                               ? (
-                                  ((e.weight_before - e.weight_after) /
-                                    e.weight_before) *
-                                  100
-                                ).toFixed(1)
+                                ((e.weight_before - e.weight_after) /
+                                  e.weight_before) *
+                                100
+                              ).toFixed(1)
                               : "0.0";
                           return (
                             <tr
                               key={i}
-                              className="border-b border-zinc-800/50 text-zinc-300"
+                              className="border-b theme-border theme-text-secondary"
                             >
                               <td className="py-2 pr-4 font-mono">
                                 {e.source}
@@ -453,13 +489,13 @@ export default function Home() {
                               <td className="py-2 pr-4 font-mono">
                                 {e.target}
                               </td>
-                              <td className="py-2 pr-4 text-right font-mono text-zinc-500">
+                              <td className="py-2 pr-4 text-right font-mono theme-text-muted">
                                 {e.weight_before.toFixed(2)}
                               </td>
-                              <td className="py-2 pr-4 text-right font-mono text-amber-400">
+                              <td className="py-2 pr-4 text-right font-mono text-amber-500">
                                 {e.weight_after.toFixed(2)}
                               </td>
-                              <td className="py-2 text-right font-mono text-green-400">
+                              <td className="py-2 text-right font-mono text-green-500">
                                 {reduction}%
                               </td>
                             </tr>

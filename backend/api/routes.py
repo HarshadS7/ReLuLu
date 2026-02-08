@@ -11,7 +11,16 @@ from api.schemas import (
     DataMeta,
     ForecastResponse,
     PipelineResponse,
+    AnalystResponse,
+    BacktestResponse,
+    AlertConfig,
+    AlertTriggered,
+    AlertCreateRequest,
 )
+import os
+from core.analyst import ReLuLuAnalyst
+from core.backtest import BacktestEngine
+from core.alerts import get_alert_manager
 from api import ticker
 from data.constants import DATA_REFRESH_INTERVAL, FORECAST_RECOMPUTE_INTERVAL
 
@@ -169,4 +178,193 @@ def health():
         "model_loaded": _engine is not None,
         "model_type": "TemporalGNN" if (_engine and _engine.is_temporal) else "legacy",
         "data_loaded": ticker.cached_forecast is not None,
+    }
+
+
+@router.get("/analyst/risk", response_model=AnalystResponse)
+def get_risk_assessment(horizon: int = 1):
+    """
+    Get AI-generated risk assessment for a specific horizon (default T+1).
+    """
+    api_key = os.getenv("FEATHERLESS_API_KEY")
+    if not api_key:
+        return AnalystResponse(
+            risk_assessment="⚠️ Featherless API key not found. Please set FEATHERLESS_API_KEY in .env.",
+            status="error"
+        )
+
+    analyst = ReLuLuAnalyst(api_key)
+    
+    # Get cached forecast
+    result = ticker.cached_forecast
+    if result is None:
+         return AnalystResponse(
+            risk_assessment="⚠️ System initializing - no forecast data available yet.",
+            status="error"
+        )
+
+    # Validate horizon
+    if horizon < 1 or horizon > len(result["horizons"]):
+         return AnalystResponse(
+            risk_assessment=f"⚠️ Invalid horizon T+{horizon}. Max horizon is T+{len(result['horizons'])}.",
+            status="error"
+        )
+
+    # Extract horizon data
+    snap = result["horizons"][horizon - 1]
+    
+    # Prepare data for analyst
+    # adapt snapshot data to flat dictionary expected by analyst.py
+    forecast_data = {
+        "hubs": snap["systemic_hubs"], # This assumes systemic_hubs is a list of names/scores?
+        # Wait, in forecast_engine.py:
+        # hubs, stability = self.optimizer.get_systemic_hubs(risk_adj)
+        # get_systemic_hubs returns (centrality_scores, stability_limit)
+        # It doesn't seem to return names directly in 'systemic_hubs'.
+        # Let's check _format_snapshot. 
+        # snap["systemic_hubs"] is used as hub_score in BankResult.
+        # so snap["systemic_hubs"] is a list of floats (centrality scores).
+        
+        # analyst.py expects: "hubs: List of primary systemic hub bank names"
+        # So I need to find the hubs from the scores.
+        
+        "reduction_pct": snap["payload_reduction"],
+        "stability_index": snap["stability"],
+        "horizon": horizon,
+        "is_stable": snap["stability"] < 1.0,
+        "raw_load": snap["raw_load"],
+        "net_load": snap["net_load"],
+        "all_horizons": [] # populate if we want temporal analysis
+    }
+
+    # Find hub names (banks with high centrality)
+    # We need the list of tickers.
+    tickers = result["metadata"]["tickers"]
+    hub_scores = snap["systemic_hubs"] # list of floats
+    
+    # Identify top hub(s)
+    # Simple heuristic: max score
+    if hub_scores is not None and len(hub_scores) == len(tickers):
+        max_score = max(hub_scores)
+        hub_indices = [i for i, s in enumerate(hub_scores) if s == max_score]
+        forecast_data["hubs"] = [tickers[i] for i in hub_indices]
+    else:
+        forecast_data["hubs"] = ["Unknown"]
+
+    # Add temporal data if requested or available
+    # analyst.py logic: if all_horizons and len > 1 -> temporal prompt
+    # Let's populate all_horizons with simplified data
+    all_horizons_data = []
+    for h_snap in result["horizons"]:
+         all_horizons_data.append({
+             "stability_index": h_snap["stability"],
+             "reduction_pct": h_snap["payload_reduction"],
+             "net_load": h_snap["net_load"],
+             "horizon": h_snap.get("horizon", 0)
+         })
+    forecast_data["all_horizons"] = all_horizons_data
+
+    assessment = analyst.summarize_risk(forecast_data)
+    
+    return AnalystResponse(
+        risk_assessment=assessment,
+        status="ok"
+    )
+
+
+# =====================================================================
+# Backtesting Routes
+# =====================================================================
+@router.get("/backtest", response_model=BacktestResponse)
+def run_backtest(days: int = 30):
+    """
+    Run a backtest comparing historical predictions to actual outcomes.
+    
+    Args:
+        days: Number of days to backtest (default 30)
+    """
+    if _engine is None or _engine.loader is None:
+        return {
+            "aggregate": {"total_days": 0, "avg_mae": None, "avg_directional_accuracy": None, "best_day": None, "worst_day": None},
+            "results": [],
+            "timestamp": "",
+        }
+    
+    backtest = BacktestEngine(_engine.loader)
+    result = backtest.run_backtest(lookback_days=days)
+    return result
+
+
+@router.get("/backtest/history")
+def get_backtest_history(limit: int = 10):
+    """Get recent backtest history entries."""
+    if _engine is None or _engine.loader is None:
+        return {"history": []}
+    
+    backtest = BacktestEngine(_engine.loader)
+    return {"history": backtest.get_history(limit=limit)}
+
+
+# =====================================================================
+# Alert Routes
+# =====================================================================
+@router.get("/alerts", response_model=list[AlertConfig])
+def get_alerts():
+    """Get all configured alerts."""
+    manager = get_alert_manager()
+    return manager.get_alerts()
+
+
+@router.post("/alerts", response_model=AlertConfig)
+def create_alert(request: AlertCreateRequest):
+    """Create a new alert configuration."""
+    manager = get_alert_manager()
+    return manager.create_alert(
+        alert_type=request.type,
+        name=request.name,
+        threshold=request.threshold,
+        description=request.description,
+        enabled=request.enabled,
+    )
+
+
+@router.delete("/alerts/{alert_id}")
+def delete_alert(alert_id: str):
+    """Delete an alert by ID."""
+    manager = get_alert_manager()
+    success = manager.delete_alert(alert_id)
+    return {"success": success, "id": alert_id}
+
+
+@router.get("/alerts/triggered", response_model=list[AlertTriggered])
+def get_triggered_alerts(since: str | None = None):
+    """Get recently triggered alerts."""
+    manager = get_alert_manager()
+    return manager.get_triggered_alerts(since=since)
+
+
+@router.post("/alerts/check")
+def check_alerts():
+    """
+    Manually check all alerts against current forecast data.
+    Returns list of newly triggered alerts.
+    """
+    result = ticker.cached_forecast
+    if result is None:
+        return {"triggered": [], "message": "No forecast data available"}
+    
+    # Get first horizon data for checking
+    snap = result["horizons"][0]
+    forecast_data = {
+        "stability": snap["stability"],
+        "payload_reduction": snap["payload_reduction"],
+        "net_load": snap["net_load"],
+    }
+    
+    manager = get_alert_manager()
+    triggered = manager.check_alerts(forecast_data)
+    
+    return {
+        "triggered": triggered,
+        "checked_at": forecast_data,
     }
